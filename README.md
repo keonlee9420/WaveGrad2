@@ -133,3 +133,4 @@ to serve TensorBoard on your localhost.
 - [ivanvovk's WaveGrad](https://github.com/ivanvovk/WaveGrad)
 - [yanggeng1995's EATS](https://github.com/yanggeng1995/EATS)
 - [ming024's FastSpeech2](https://github.com/ming024/FastSpeech2)
+- [mindslab-ai's wavegrad2](https://github.com/mindslab-ai/wavegrad2)

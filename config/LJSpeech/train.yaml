@@ -1,18 +1,19 @@
 path:
-  ckpt_path: "./output/ckpt/LJSpeech_wg2_TEST_down______logging_phone"
-  log_path: "./output/log/LJSpeech_wg2_TEST_down______logging_phone"
-  result_path: "./output/result/LJSpeech_wg2_TEST_down______logging_phone"
+  ckpt_path: "./output/ckpt/LJSpeech"
+  log_path: "./output/log/LJSpeech"
+  result_path: "./output/result/LJSpeech"
   noise_schedule_path: "./noise_schedule"
 optimizer:
   batch_size: 12
   betas: [0.9, 0.98]
   eps: 0.000000001
-  weight_decay: 0.0
+  weight_decay: 0.000001
   grad_clip_thresh: 1.0
   grad_acc_step: 1
   warm_up_step: 4000
   anneal_steps: [300000, 400000, 500000]
   anneal_rate: 0.3
+  init_lr: 0.0003
 step:
   total_step: 900000
   log_step: 100
@@ -20,7 +21,7 @@ step:
   val_step: 1000
   save_step: 50000
 window:
-  segment_length: 19200 # [19200, 76800]
+  segment_length: 76800 # [19200, 76800]
   noise_iter: 1000 # [6, 7, 12, 25, 50, 100, 1000]
   # training_noise_schedule: {
   #   "n_iter": 1000,

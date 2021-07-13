@@ -100,12 +100,17 @@ class GaussianUpsampling(nn.Module):
 
     def __init__(self, model_config):
         super(GaussianUpsampling, self).__init__()
-        # self.range_param_predictor = RangeParameterPredictor(model_config)
+        self.range_param_predictor = RangeParameterPredictor(model_config)
+
+    def get_alignment_energies(self, gaussian, frames):
+        """
+        See https://github.com/mindslab-ai/wavegrad2
+        """
+        energies = gaussian.log_prob(frames).exp()  # [B, L, T]
+        return energies
 
     def forward(self, encoder_outputs, duration, mask):
         device = encoder_outputs.device
-
-        # range_param = self.range_param_predictor(encoder_outputs, duration, mask)
 
         t = torch.sum(duration, dim=-1, keepdim=True) #[B, 1]
 
@@ -114,25 +119,19 @@ class GaussianUpsampling(nn.Module):
         t = torch.arange(1, torch.max(t).item()+1, device=device) # (1, ..., T)
         t = t.unsqueeze(0).unsqueeze(1) #[1, 1, T]
         c = c.unsqueeze(2)
+        s = self.range_param_predictor(encoder_outputs, duration, mask).unsqueeze(-1)
 
-        # print(range_param, 0.1*(range_param ** 2))
+        g = torch.distributions.normal.Normal(loc=c, scale=s)
 
-        # w_1 = torch.exp(-0.1*(range_param.unsqueeze(-1) ** -2) * (t - c) ** 2)  # [B, L, T]
-        # w_2 = torch.sum(torch.exp(-0.1*(range_param.unsqueeze(-1) ** -2) * (t - c) ** 2), dim=1, keepdim=True)  # [B, 1, T]
-        w_1 = torch.exp(-0.1 * (t - c) ** 2)  # [B, L, T]
-        w_2 = torch.sum(torch.exp(-0.1 * (t - c) ** 2), dim=1, keepdim=True)  # [B, 1, T]
-        w_2[w_2==0.] = 1.
+        w = self.get_alignment_energies(g, t)  # [B, L, T]
 
-        # w_1 = self.normpdf(t, c, range_param.unsqueeze(-1))  # [B, L, T]
-        # w_1 = torch.distributions.normal.Normal(c, 0.1).log_prob(t)  # [B, L, T]
-        # w_2 = torch.sum(w_1, dim=1, keepdim=True)  # [B, 1, T]
-        # w_2[w_2==0.] = 1.
+        if mask is not None:
+            w = w.masked_fill(mask.unsqueeze(-1), 0.0)
 
-        w = w_1 / w_2
+        attn = w / (torch.sum(w, dim=1).unsqueeze(1) + 1e-8)  # [B, L, T]
+        out = torch.bmm(attn.transpose(1, 2), encoder_outputs)
 
-        out = torch.matmul(w.transpose(1, 2), encoder_outputs)
-
-        return out, w
+        return out, attn
 
 
 class DurationPredictor(nn.Module):
@@ -163,33 +162,33 @@ class DurationPredictor(nn.Module):
         return duration_prediction
 
 
-# class RangeParameterPredictor(nn.Module):
-#     """ Range Parameter Predictor """
+class RangeParameterPredictor(nn.Module):
+    """ Range Parameter Predictor """
 
-#     def __init__(self, model_config):
-#         super(RangeParameterPredictor, self).__init__()
-#         encoder_hidden = model_config["transformer"]["encoder_hidden"]
-#         variance_hidden = model_config["variance_predictor"]["variance_hidden"]
+    def __init__(self, model_config):
+        super(RangeParameterPredictor, self).__init__()
+        encoder_hidden = model_config["transformer"]["encoder_hidden"]
+        variance_hidden = model_config["variance_predictor"]["variance_hidden"]
 
-#         self.range_param_lstm = nn.LSTM(
-#             encoder_hidden + 1,
-#             int(variance_hidden / 2), 2,
-#             batch_first=True, bidirectional=True
-#         )
-#         self.range_param_proj = nn.Sequential(
-#             LinearNorm(variance_hidden, 1),
-#             nn.Softplus(),
-#         )
+        self.range_param_lstm = nn.LSTM(
+            encoder_hidden + 1,
+            int(variance_hidden / 2), 2,
+            batch_first=True, bidirectional=True
+        )
+        self.range_param_proj = nn.Sequential(
+            LinearNorm(variance_hidden, 1),
+            nn.Softplus(),
+        )
 
-#     def forward(self, encoder_output, duration, mask):
-#         range_param_input = torch.cat([encoder_output, duration.unsqueeze(-1)], dim=-1)
-#         range_param_prediction, _ = self.range_param_lstm(range_param_input)
-#         range_param_prediction = self.range_param_proj(range_param_prediction)
-#         range_param_prediction = range_param_prediction.squeeze(-1) # [B, L]
-#         if mask is not None:
-#             range_param_prediction = range_param_prediction.masked_fill(mask, 0.0)
+    def forward(self, encoder_output, duration, mask):
+        range_param_input = torch.cat([encoder_output, duration.unsqueeze(-1)], dim=-1)
+        range_param_prediction, _ = self.range_param_lstm(range_param_input)
+        range_param_prediction = self.range_param_proj(range_param_prediction)
+        range_param_prediction = range_param_prediction.squeeze(-1) # [B, L]
+        if mask is not None:
+            range_param_prediction = range_param_prediction.masked_fill(mask, 0.0)
 
-#         return range_param_prediction
+        return range_param_prediction
 
 
 class SamplingWindow(nn.Module):

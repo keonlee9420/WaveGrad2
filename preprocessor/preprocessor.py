@@ -23,7 +23,6 @@ class Preprocessor:
     def build_from_path(self):
         os.makedirs((os.path.join(self.out_dir, "wav")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "duration")), exist_ok=True)
-        # os.makedirs((os.path.join(self.out_dir, "duration_up")), exist_ok=True)
 
         print("Processing Data ...")
         out = list()
@@ -96,15 +95,6 @@ class Preprocessor:
             int(self.sampling_rate * start) : int(self.sampling_rate * end)
         ].astype(np.float32)
 
-        # # A single frame padding
-        # if sum(duration_up) > wav.shape[0]:
-        #     wav = np.concatenate((wav, np.array([0.])))
-        # elif sum(duration_up) < wav.shape[0]:
-        #     wav = wav[:-1]
-
-        # assert sum(duration_up) == wav.shape[0], \
-        #     "{} is wrongly processed in length!: {} != {}".format(basename, sum(duration_up), wav.shape[0])
-
         # Read raw text
         with open(text_path, "r") as f:
             raw_text = f.readline().strip("\n")
@@ -112,9 +102,6 @@ class Preprocessor:
         # Save files
         dur_filename = "{}-duration-{}.npy".format(speaker, basename)
         np.save(os.path.join(self.out_dir, "duration", dur_filename), duration)
-
-        # dur_up_filename = "{}-duration_up-{}.npy".format(speaker, basename)
-        # np.save(os.path.join(self.out_dir, "duration_up", dur_up_filename), duration_up)
 
         wav_filename = "{}-wav-{}.wav".format(speaker, basename)
         wavfile.write(
@@ -162,16 +149,9 @@ class Preprocessor:
                     - np.round(s * self.sampling_rate / self.hop_length)
                 )
             )
-            # durations_up.append(
-            #     int(
-            #         np.round(e * self.sampling_rate)
-            #         - np.round(s * self.sampling_rate)
-            #     )
-            # )
 
         # Trim tailing silences
         phones = phones[:end_idx]
         durations = durations[:end_idx]
-        # durations_up = durations_up[:end_idx]
 
         return phones, durations, durations_up, start_time, end_time
