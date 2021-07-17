@@ -10,9 +10,6 @@ PyTorch Implementation of Google Brain's [WaveGrad 2: Iterative Refinement for T
     <img src="img/model_2.png" width="80%">
 </p>
 
-# Status (2021.06.22)
-- [x] Working on
-
 # Quickstart
 
 ## Dependencies
@@ -55,7 +52,6 @@ python3 synthesize.py --text "YOUR_DESIRED_TEXT" --restore_step 900000 --mode si
 The supported datasets are
 
 - [LJSpeech](https://keithito.com/LJ-Speech-Dataset/): a single-speaker English dataset consists of 13100 short audio clips of a female speaker reading passages from 7 non-fiction books, approximately 24 hours in total.
-- (will be added more)
 
 ## Preprocessing
  
@@ -113,8 +109,8 @@ to serve TensorBoard on your localhost.
 # Implementation Issues
 
 1. Use `22050Hz` instead of `24KHz` and follow general LJSpeech configurations.
-2. Add `nn.ReLU()` activation at the end of the duration predictor to force the value positive.
-3. Follow the Aligher of [EATS: End-to-End Adversarial Text-to-Speech](https://arxiv.org/abs/2006.03575) for the Gaussian upsampling, rather than that of [Non-Attentive Tacotron](https://arxiv.org/abs/2010.04301).
+2. No **ZoneOutBiLSTM** in TextEncoder. Use `nn.LSTM` instead.
+3. Preprocess text input without silence tokens inserted at word boundaries.
 
 # Citation
 
@@ -131,6 +127,5 @@ to serve TensorBoard on your localhost.
 
 # References
 - [ivanvovk's WaveGrad](https://github.com/ivanvovk/WaveGrad)
-- [yanggeng1995's EATS](https://github.com/yanggeng1995/EATS)
-- [ming024's FastSpeech2](https://github.com/ming024/FastSpeech2)
 - [mindslab-ai's wavegrad2](https://github.com/mindslab-ai/wavegrad2)
+- [ming024's FastSpeech2](https://github.com/ming024/FastSpeech2)

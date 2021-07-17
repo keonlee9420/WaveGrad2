@@ -8,7 +8,6 @@ import audio as Audio
 from scipy.io import wavfile
 from matplotlib import pyplot as plt
 from datetime import datetime
-from benchmark import compute_rtf
 
 
 matplotlib.use("Agg")
@@ -63,12 +62,15 @@ def to_device(data, device):
 
 
 def log(
-    logger, step=None, losses=None, fig=None, audio=None, sampling_rate=22050, tag=""
+    logger, step=None, losses=None, lr=None, fig=None, audio=None, sampling_rate=22050, tag=""
 ):
     if losses is not None:
         logger.add_scalar("Loss/total_loss", losses[0], step)
         logger.add_scalar("Loss/noise", losses[1], step)
         logger.add_scalar("Loss/duration_loss", losses[2], step)
+
+    if lr is not None:
+        logger.add_scalar("Training/learning_rate", lr, step)
 
     if fig is not None:
         logger.add_figure(tag, fig)
@@ -99,7 +101,7 @@ def expand(values, durations):
     return np.array(out)
 
 
-def synth_one_sample(model, targets, predictions, STFT, noise_schedule=None):
+def synth_one_sample(model, targets, predictions, STFT):
 
     basename = targets[0][0]
 
@@ -118,23 +120,10 @@ def synth_one_sample(model, targets, predictions, STFT, noise_schedule=None):
             end_idx = i
             break
     phone_ = phone.strip("}{").split(" ")[start_idx:end_idx+1]
-    # print("\n", raw_text_full)
-    # print(phone)
-    # print(f"Phone Seg {start_idx}:{end_idx} =", phone_)
-
     audio_len = predictions[2][0].sum().item()
     attention = predictions[5][0][:, :audio_len].detach().cpu().numpy()
 
     # Sample Audio
-    if noise_schedule is not None:
-        model.decoder.set_new_noise_schedule(
-            init=torch.linspace,
-            init_kwargs={
-                'steps': noise_schedule["n_iter"],
-                'start': noise_schedule["betas_range"][0],
-                'end': noise_schedule["betas_range"][1]
-            }
-        )
     with torch.no_grad():
         start = datetime.now()
         audio_prediction = model.decoder.forward(
@@ -162,32 +151,22 @@ def synth_one_sample(model, targets, predictions, STFT, noise_schedule=None):
     return fig, audio_target, audio_prediction, basename
 
 
-def synth_samples(model, targets, STFT, preprocess_config, path):
+def synth_samples(output_audios, targets, STFT, preprocess_config, path):
 
     basenames = targets[0]
     sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
 
-    rtfs = []
     for i in range(len(basenames)):
         basename = basenames[i]
-
-        # Sample Audio
-        start = datetime.now()
-        output = model.decoder.forward(
-            model.encoder_seg.transpose(-2, -1), store_intermediate_states=False
-        )[i].cpu().squeeze()
-        end = datetime.now()
-        inference_time = (end - start).total_seconds()
-        rtf = compute_rtf(output, inference_time, sample_rate=sampling_rate)
-        rtfs.append(rtf)
+        audio_prediction = output_audios[i].cpu().squeeze()
 
         # Save Audio
         wavfile.write(
-            os.path.join(path, "{}.wav".format(basename)), sampling_rate, output.numpy()
+            os.path.join(path, "{}.wav".format(basename)), sampling_rate, audio_prediction.numpy()
         )
 
         # Draw and Save Spectrogram
-        mel_prediction, _ = Audio.tools.get_mel_from_wav(output, STFT)
+        mel_prediction, _ = Audio.tools.get_mel_from_wav(audio_prediction, STFT)
         fig = plot_mel(
             [
                 mel_prediction,
@@ -196,8 +175,6 @@ def synth_samples(model, targets, STFT, preprocess_config, path):
         )
         plt.savefig(os.path.join(path, "{}.png".format(basename)))
         plt.close()
-
-    print(f'Synthesis Done. RTF estimate: {np.mean(rtfs)} ± {np.std(rtfs)}')
 
 
 def plot_mel(data, titles, attention=False, phone=None):
@@ -289,3 +266,11 @@ def pad(input_ele, mel_max_length=None):
         out_list.append(one_batch_padded)
     out_padded = torch.stack(out_list)
     return out_padded
+
+
+def compute_rtf(sample, generation_time, sample_rate=22050):
+    """
+    Computes RTF for a given sample.
+    """
+    total_length = sample.shape[-1]
+    return float(generation_time * sample_rate / total_length)

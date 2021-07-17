@@ -108,7 +108,7 @@ def main(args, configs):
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
 
                     # Update weights
-                    optimizer.step_and_update_lr()
+                    lr = optimizer.step_and_update_lr()
                     optimizer.zero_grad()
 
                 if step % log_step == 0:
@@ -123,7 +123,7 @@ def main(args, configs):
 
                     outer_bar.write(message1 + message2)
 
-                    log(train_logger, step, losses=losses)
+                    log(train_logger, step, losses=losses, lr=lr)
 
                 if step % synth_step == 0:
                     fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(

@@ -10,15 +10,15 @@ optimizer:
   weight_decay: 0.000001
   grad_clip_thresh: 1.0
   grad_acc_step: 1
-  warm_up_step: 4000
-  anneal_steps: [300000, 400000, 500000]
-  anneal_rate: 0.3
   init_lr: 0.0003
+  decay_rate: 0.05
+  decay_start: 25000
+  decay_end: 100000
 step:
   total_step: 900000
   log_step: 100
   synth_step: 1000
-  val_step: 1000
+  val_step: 10000
   save_step: 50000
 window:
   segment_length: 76800 # [19200, 76800]

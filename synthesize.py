@@ -12,9 +12,10 @@ from pypinyin import pinyin, Style
 import audio as Audio
 
 from utils.model import get_model, set_noise_schedule
-from utils.tools import to_device, synth_samples
+from utils.tools import to_device, synth_samples, compute_rtf
 from dataset import TextDataset
 from text import text_to_sequence
+from datetime import datetime
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -89,23 +90,31 @@ def preprocess_mandarin(text, preprocess_config):
 def synthesize(model, step, configs, batchs, STFT, control_values):
     preprocess_config, model_config, train_config = configs
     duration_control = control_values
+    sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
 
+    rtfs = []
     for batch in batchs:
         batch = to_device(batch, device)
         with torch.no_grad():
             # Forward
-            output = model(
+            start = datetime.now()
+            output = model.inference(
                 *(batch[2:]),
                 d_control=duration_control,
-                full_len=True,
             )
+            end = datetime.now()
+            inference_time = (end - start).total_seconds()
+            rtf = compute_rtf(output, inference_time, sample_rate=sampling_rate)
+            rtfs.append(rtf)
+
             synth_samples(
-                model,
+                output,
                 batch,
                 STFT,
                 preprocess_config,
                 train_config["path"]["result_path"],
             )
+    print(f'Synthesis Done. RTF estimate: {np.mean(rtfs)} ± {np.std(rtfs)}')
 
 
 if __name__ == "__main__":
