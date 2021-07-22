@@ -114,7 +114,7 @@ montreal-forced-aligner/
 raw_data/
 output/
 *.npy
-*.wav
+preprocessed_data**/*.wav
 TextGrid/
 hifigan/*.pth.tar
 *.out
